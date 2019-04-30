@@ -18,7 +18,11 @@ public class Robot {
     IMailDelivery delivery;
     protected final String id;
     /** Possible states the robot can be in */
-    public enum RobotState { DELIVERING, WAITING, RETURNING }
+    
+    // 
+    public enum RobotState { DELIVERING_AS_SINGLE, WAITING, RETURNING, 
+    								DELIVERING_AS_LEADER,
+    								DELIVERING_AS_MEMBER}
     public RobotState current_state;
     private int current_floor;
     private int destination_floor;
@@ -29,6 +33,9 @@ public class Robot {
     private MailItem tube = null;
     
     private int deliveryCounter;
+    
+    // frozen variable for robots which are in a team
+    private boolean frozen = false;
     
 
     /**
@@ -82,10 +89,10 @@ public class Robot {
                 	receivedDispatch = false;
                 	deliveryCounter = 0; // reset delivery counter
         			setRoute();
-                	changeState(RobotState.DELIVERING);
+                	changeState(RobotState.DELIVERING_AS_SINGLE);
                 }
                 break;
-    		case DELIVERING:
+    		case DELIVERING_AS_SINGLE:
     			if(current_floor == destination_floor){ // If already here drop off either way
                     /** Delivery complete, report this to the simulator! */
                     delivery.deliver(deliveryItem);
@@ -103,13 +110,20 @@ public class Robot {
                         deliveryItem = tube;
                         tube = null;
                         setRoute();
-                        changeState(RobotState.DELIVERING);
+                        changeState(RobotState.DELIVERING_AS_SINGLE);
                     }
     			} else {
 	        		/** The robot is not at the destination yet, move towards it! */
 	                moveTowards(destination_floor);
     			}
                 break;
+    		case DELIVERING_AS_LEADER:
+    			// TODO
+    			break;
+    		case DELIVERING_AS_MEMBER:
+    			// TODO
+    			break;
+    			
     	}
     }
 
@@ -147,7 +161,7 @@ public class Robot {
             System.out.printf("T: %3d > %7s changed from %s to %s%n", Clock.Time(), getIdTube(), current_state, nextState);
     	}
     	current_state = nextState;
-    	if(nextState == RobotState.DELIVERING){
+    	if(nextState == RobotState.DELIVERING_AS_SINGLE){
             System.out.printf("T: %3d > %7s-> [%s]%n", Clock.Time(), getIdTube(), deliveryItem.toString());
     	}
     }
@@ -182,5 +196,19 @@ public class Robot {
 		tube = mailItem;
 		if (tube.weight > INDIVIDUAL_MAX_WEIGHT) throw new ItemTooHeavyException();
 	}
+	
+	
+	// Handled with ENUM
+	
+	// Freeze or thaw a robot 
+	// A robot is frozen if it is in a team whose leader is delivering an item
+	// A robot is thawed if it is available
+	/*public void changeFrozenState() {
+		if(this.frozen) {
+			this.frozen = false;
+		} else {
+			this.frozen = true;
+		}
+	} */
 
 }
