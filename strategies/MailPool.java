@@ -95,6 +95,8 @@ public class MailPool implements IMailPool {
 							int numRobots = 2;
 							if(draftTeam == null) {
 								draftTeam = new Team(nextItem);
+								System.out.print("Creating draft team\n");
+
 							}
 							// need to do draft team because there might not be 
 							// enough robots this tick
@@ -110,12 +112,15 @@ public class MailPool implements IMailPool {
 							int numRobots = 3;
 							if(draftTeam == null) {
 								draftTeam = new Team(nextItem);
+								System.out.print("Creating draft team\n");
+
 							}
 							// need to do draft team because there might not be 
 							// enough robots this tick
 							for(index=0; index<numRobots; index++) {
 								if(!(draftTeam.robotListIsFull())) {
 									if(i.hasNext()) {
+										System.out.println("Added robot to draft team");
 										addRobotToTeam(draftTeam);
 									}
 								}
@@ -123,12 +128,13 @@ public class MailPool implements IMailPool {
 						}
 				
 						if(draftTeam.robotListIsFull()) {
+							System.out.println("Draft team is full");
 							if(!(draftTeam.tubesFilled())) {
+								System.out.println("A robot in the team has an empty tube");
 								// pool of items
 								//while(pool.size() > 0) {
 								for(Robot r: draftTeam.getRobotList()) {
 									loadTubeItem(j, r);
-									System.out.println("After load tube item");
 								}
 							}
 						}
@@ -150,10 +156,19 @@ public class MailPool implements IMailPool {
 	}
 				
 	private boolean loadTubeItem(ListIterator<Item> j, Robot r) throws ItemTooHeavyException {
+		//System.out.println("In load tube item function");
+		if(r.getTube() != null) {
+			return true;
+		}
+		
 		if(!(j.hasNext())) {
 			// no tube item
+			//System.out.println("No tube item available");
 			return false;
 		}
+		
+		//System.out.println("Loading a tube item into a robot on a team");
+
 		Item item = j.next();
 		while(item.mailItem.getWeight() > Robot.INDIVIDUAL_MAX_WEIGHT) {
 			if(!(j.hasNext())) {
@@ -164,7 +179,6 @@ public class MailPool implements IMailPool {
 				
 				
 		r.addToTube(item.mailItem);
-		System.out.print("after add to tube\n");
 		//i.remove();       // remove from mailPool queue
 		j.remove();
 		return true;
@@ -201,6 +215,7 @@ public class MailPool implements IMailPool {
 			try {
 				m = j.next().mailItem;
 				if(m.getWeight() <= Robot.INDIVIDUAL_MAX_WEIGHT) {
+					//System.out.println("Add to hand");
 					robot.addToHand(m); // hand first as we want higher priority delivered first
 					j.remove();
 				}
@@ -211,7 +226,6 @@ public class MailPool implements IMailPool {
 						; // can't do anything
 						return;
 					} else {
-						System.out.println(m.getWeight());
 						robot.addToTube(m);
 						j.remove();	
 					}
@@ -234,7 +248,7 @@ public class MailPool implements IMailPool {
 	
 	public void disbandTeam(Team team) {
 		for(Robot robot : team.getRobotList()) {
-			robot.setInTeam(false);
+			robot.setInTeam(false, team);
 		}
 		setOfTeams.remove(team);
 		
