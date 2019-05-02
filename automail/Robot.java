@@ -36,6 +36,7 @@ public class Robot implements Deliverer {
     
     private int deliveryCounter;
     private boolean inTeam = false;
+    private Team team = null;
     
 
     /**
@@ -64,7 +65,10 @@ public class Robot implements Deliverer {
      * This is called on every time step
      * @throws ExcessiveDeliveryException if robot delivers more than the capacity of the tube without refilling
      */
-    public void step() throws ExcessiveDeliveryException {    	
+    public void step() throws ExcessiveDeliveryException {
+    	if(this.inTeam) {
+    		return;
+    	}
     	switch(current_state) {
     		/** This state is triggered when the robot is returning to the mailroom after a delivery */
     		case RETURNING:
@@ -96,6 +100,7 @@ public class Robot implements Deliverer {
     			if(current_floor == destination_floor){ // If already here drop off either way
                     /** Delivery complete, report this to the simulator! */
                     delivery.deliver(deliveryItem);
+            		System.out.println("robot " + getID() + " delivering item");
                     deliveryItem = null;
                     deliveryCounter++;
                     if(deliveryCounter > 2){  // Implies a simulation bug
@@ -108,6 +113,7 @@ public class Robot implements Deliverer {
                     else{
                         /** If there is another item, set the robot's route to the location to deliver the item */
                         deliveryItem = tube;
+                		System.out.println("robot " + getID() + " swtiching tube item to hand");
                         tube = null;
                         setRoute();
                         changeState(RobotState.DELIVERING_AS_SINGLE);
@@ -126,13 +132,47 @@ public class Robot implements Deliverer {
     			
     	}
     }
-
+    
+    public boolean teamStep() throws ExcessiveDeliveryException{
+    	if(current_floor == destination_floor){
+    		deliveryItem = null;
+            deliveryCounter++;
+            if(deliveryCounter > 2){  // Implies a simulation bug
+            	throw new ExcessiveDeliveryException();
+            }
+            /** Check if want to return, i.e. if there is no item in the tube*/
+            if(tube == null){
+            	changeState(RobotState.RETURNING);
+            }
+            else{
+                /** If there is another item, set the robot's route to the location to deliver the item */
+                deliveryItem = tube;
+        		System.out.println("robot " + getID() + " switching tube item to hand");
+                tube = null;
+                setRoute();
+                changeState(RobotState.DELIVERING_AS_SINGLE);
+            }
+    		System.out.println("robot " + getID() + " delivering team item");
+            return true;
+		} 
+    	else {
+    		/** The robot is not at the destination yet, move towards it! */
+            moveTowards(destination_floor);
+            return false;
+		}
+    }
+    
+    
     /**
      * Sets the route for the robot
      */
     public void setRoute() {
         /** Set the destination floor */
-        destination_floor = deliveryItem.getDestFloor();
+    	if(deliveryItem == null) {
+    	}
+		System.out.println("setting route for robot " + getID());
+
+    	destination_floor = deliveryItem.getDestFloor();
     }
     
     /* If a robot is in a team, it will not have
@@ -196,12 +236,20 @@ public class Robot implements Deliverer {
 	public void addToHand(MailItem mailItem) throws ItemTooHeavyException {
 		assert(deliveryItem == null);
 		deliveryItem = mailItem;
+		System.out.println("robot " + getID() + "adding to hand");
 		if (deliveryItem.weight > INDIVIDUAL_MAX_WEIGHT) throw new ItemTooHeavyException();
+	}
+	
+	public void addToTeamHand(MailItem mailItem) {
+		assert(deliveryItem == null);
+		System.out.println("robot " + getID() + " adding to team hand");
+		deliveryItem = mailItem;
 	}
 
 	public void addToTube(MailItem mailItem) throws ItemTooHeavyException {
 		assert(tube == null);
 		tube = mailItem;
+		System.out.println("robot " + getID() + " adding to tube");
 		if (tube.weight > INDIVIDUAL_MAX_WEIGHT) throw new ItemTooHeavyException();
 	}
 	
@@ -209,7 +257,12 @@ public class Robot implements Deliverer {
 		return this.inTeam;
 	}
 	
-	public void setInTeam(boolean inTeam) {
+	public void setInTeam(boolean inTeam, Team team) {
+		if(inTeam) {
+			this.team = team;
+		} else {
+			this.team = null;
+		}
 		this.inTeam = inTeam;
 	}
 	
@@ -223,6 +276,9 @@ public class Robot implements Deliverer {
 	
 	public void setState(RobotState state) {
 		this.current_state = state;
+	}
+	public String getID() {
+		return id;
 	}
 
 }
