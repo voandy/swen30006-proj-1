@@ -3,13 +3,15 @@ package automail;
 import exceptions.ExcessiveDeliveryException;
 import exceptions.ItemTooHeavyException;
 import strategies.IMailPool;
+import strategies.MailPool;
+
 import java.util.Map;
 import java.util.TreeMap;
 
 /**
  * The robot delivers mail!
  */
-public class Robot {
+public class Robot implements Deliverer {
 	
     static public final int INDIVIDUAL_MAX_WEIGHT = 2000;
     static public final int PAIR_MAX_WEIGHT = 2600;
@@ -33,9 +35,7 @@ public class Robot {
     private MailItem tube = null;
     
     private int deliveryCounter;
-    
-    // frozen variable for robots which are in a team
-    private boolean frozen = false;
+    private boolean inTeam = false;
     
 
     /**
@@ -130,9 +130,17 @@ public class Robot {
     /**
      * Sets the route for the robot
      */
-    private void setRoute() {
+    public void setRoute() {
         /** Set the destination floor */
         destination_floor = deliveryItem.getDestFloor();
+    }
+    
+    /* If a robot is in a team, it will not have
+    ** access to the delivery floor, so it must be provided
+    */
+    public void setRouteInTeam(int deliveryFloor) {
+        /** Set the destination floor */
+    	destination_floor = deliveryFloor;
     }
 
     /**
@@ -197,18 +205,24 @@ public class Robot {
 		if (tube.weight > INDIVIDUAL_MAX_WEIGHT) throw new ItemTooHeavyException();
 	}
 	
+	public boolean getInTeam() {
+		return this.inTeam;
+	}
 	
-	// Handled with ENUM
+	public void setInTeam(boolean inTeam) {
+		this.inTeam = inTeam;
+	}
 	
-	// Freeze or thaw a robot 
-	// A robot is frozen if it is in a team whose leader is delivering an item
-	// A robot is thawed if it is available
-	/*public void changeFrozenState() {
-		if(this.frozen) {
-			this.frozen = false;
-		} else {
-			this.frozen = true;
-		}
-	} */
+	public IMailPool getMailPool() {
+		return this.mailPool;
+	}
+	
+	public void resetDeliveryCounter() {
+		this.deliveryCounter = 0;
+	}
+	
+	public void setState(RobotState state) {
+		this.current_state = state;
+	}
 
 }
