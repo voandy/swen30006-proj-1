@@ -10,6 +10,7 @@ import strategies.MailPool;
 public class Team implements Deliverer {
 	public static final int teamStepRate = 3;
 	
+	IMailDelivery delivery;
 	private ArrayList<Robot> robotList;
 	private MailItem heavyDeliveryItem;
 	private int stepCounter;
@@ -45,13 +46,18 @@ public class Team implements Deliverer {
 			stepCounter = 0;
 			// do something
 			// call step on the leader robot
+			for(Robot r: robotList) {
+				if(r.teamStep()) {
+					delivery.deliver(heavyDeliveryItem);
+				}
+			}
 		} else {
 			this.stepCounter++;
 		}
 		
-		for(Robot r: robotList) {
-			r.step();
-		}
+//		for(Robot r: robotList) {
+//			r.step();
+//		}
 	}
 	
 	public MailItem getMailItem() {
@@ -77,7 +83,9 @@ public class Team implements Deliverer {
 	
 	public void addRobot(Robot robot) {
 		robotList.add(robot);
-		robot.setInTeam(true);
+		robot.setInTeam(true, this);
+		robot.addToTeamHand(this.getMailItem());
+		System.out.println("adding robot " + robot.getID() + " to team");
 	}
 	
 	public boolean robotListIsFull() {
