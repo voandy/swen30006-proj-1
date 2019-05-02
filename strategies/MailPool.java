@@ -9,6 +9,7 @@ import automail.MailItem;
 import automail.PriorityMailItem;
 import automail.Robot;
 import automail.Team;
+import exceptions.ExcessiveDeliveryException;
 import exceptions.ItemTooHeavyException;
 
 public class MailPool implements IMailPool {
@@ -54,6 +55,8 @@ public class MailPool implements IMailPool {
 	private LinkedList<Robot> robots;
 	// set of current teams
 	private ArrayList<Team> setOfTeams;
+	
+	private Team draftTeam = null;
 
 	public MailPool(int nrobots){
 		// Start empty
@@ -69,103 +72,172 @@ public class MailPool implements IMailPool {
 	}
 	
 	@Override
-	public void step() throws ItemTooHeavyException {
-		Team team;
+	public void step() throws ItemTooHeavyException, ExcessiveDeliveryException {
+		
 		for(Team team : setOfTeams) {
 			team.step();
 		}
-		boolean weNeedATeam = true;
+		int index; 
+
 		
 		ListIterator<Item> j = pool.listIterator();
 		ListIterator<Robot> i = robots.listIterator();
 		
-		int index; 
-		
-		if(weNeedATeam) {
-			try {
-				int weight = j.next().getMailItem().getWeight();
-				if(j.hasNext()) {
-					weight = j.next().mailItem.getWeight();
-					MailItem mailItem = j.next().getMailItem();
-					if(weight > Robot.INDIVIDUAL_MAX_WEIGHT && weight <= Robot.PAIR_MAX_WEIGHT) {
-						// need 2 robots
-						int numRobots = 2;
-						Team team = new Team(j.next().mailItem);
-						for(index=0; index<numRobots; index++) {
-							if(i.hasNext()) {
-								addRobotToTeam(team);
+		if(j.hasNext()) {
+			MailItem nextItem = j.next().getMailItem();
+			int weight = nextItem.getWeight();
+			Team team = null; //keep compiler happy
+			if(weight > Robot.INDIVIDUAL_MAX_WEIGHT) {
+				try {
+					if(j.hasNext()) {						
+						if(weight <= Robot.PAIR_MAX_WEIGHT) {
+							// need 2 robots
+							int numRobots = 2;
+							if(draftTeam == null) {
+								draftTeam = new Team(nextItem);
 							}
-							
-						}					
-					} else if(weight > Robot.PAIR_MAX_WEIGHT && weight <= Robot.TRIPLE_MAX_WEIGHT) {
-						// need 3 robots
-						int numRobots = 3;
-						Team team = new Team(j.next().mailItem);
-						for(index=0; index<numRobots; index++) {
-							if(i.hasNext()) {
-								addRobotToTeam(team);
+							// need to do draft team because there might not be 
+							// enough robots this tick
+							for(index=0; index<numRobots; index++) {
+								if(!(draftTeam.robotListIsFull())) {
+									if(i.hasNext()) {
+										addRobotToTeam(draftTeam);
+									}
+								}
+							}		
+						} else {
+							// need 3 robots
+							int numRobots = 3;
+							if(draftTeam == null) {
+								draftTeam = new Team(nextItem);
 							}
-							
-						}					
-					}
-					
-				}
-			
-				Robot robot = team.getRobotList().get(0); // leader
-				if(pool.size() > 0) {
-					robot.addToHand(team.getMailItem());
-					j.remove(team.getMailItem());
-					i.remove(robot);
-					robot.dispatch();
-				}
+							// need to do draft team because there might not be 
+							// enough robots this tick
+							for(index=0; index<numRobots; index++) {
+								if(!(draftTeam.robotListIsFull())) {
+									if(i.hasNext()) {
+										addRobotToTeam(draftTeam);
+									}
+								}
+							}
+						}
 				
-				while(pool.size() > 0) {
-					try {
-						robot.addToTube(j.next().mailItem);
-						i.remove();       // remove from mailPool queue
-						j.remove();
+						if(draftTeam.robotListIsFull()) {
+							if(!(draftTeam.tubesFilled())) {
+								// pool of items
+								//while(pool.size() > 0) {
+								for(Robot r: draftTeam.getRobotList()) {
+									loadTubeItem(j, r);
+									System.out.println("After load tube item");
+								}
+							}
+						}
 					}
-					
-					} catch (Exception e) { 
-			            throw e; 
-			        } 
+				} catch (ItemTooHeavyException e) {
+					throw e;
 				}
-			} catch (Exception e) {
-				throw e;
-			}
-		} else { // single robot
-			try {
-				while(i.hasNext()) loadRobot(i, j);
-			} catch (Exception e) {
-				throw e;
+			} else { // single robot
+				try {
+					while(i.hasNext()) {
+						// try to load a robot
+						loadRobot(i);
+					}
+				} catch (Exception e) {
+					throw e;
+				}
 			}
 		}
 	}
+				
+	private boolean loadTubeItem(ListIterator<Item> j, Robot r) throws ItemTooHeavyException {
+		if(!(j.hasNext())) {
+			// no tube item
+			return false;
+		}
+		Item item = j.next();
+		while(item.mailItem.getWeight() > Robot.INDIVIDUAL_MAX_WEIGHT) {
+			if(!(j.hasNext())) {
+				return false;
+			}
+			item = j.next();
+		}
+				
+				
+		r.addToTube(item.mailItem);
+		System.out.print("after add to tube\n");
+		//i.remove();       // remove from mailPool queue
+		j.remove();
+		return true;
+	}
 	
+//	private void loadTeam(ListIterator<Robot> i, ListIterator<Item> j) throws ItemTooHeavyException {
+//		Robot robot = i.next();
+//		assert(robot.isEmpty());
+//		// System.out.printf("P: 1d%n", pool.size());
+//		
+//		if (pool.size() > 0) {
+//			try {
+//			robot.addToHand(j.next().mailItem); // hand first as we want higher priority delivered first
+//			j.remove();
+//			if (pool.size() > 0) {
+//				robot.addToTube(j.next().mailItem);
+//				j.remove();
+//			}
+//			robot.dispatch(); // send the robot off if it has any items to deliver
+//			i.remove();       // remove from mailPool queue
+//			} catch (Exception e) { 
+//	            throw e; 
+//	        } 
+//		}
+//	}
 	
-	private void loadRobot(ListIterator<Robot> i, ListIterator<Item> j) throws ItemTooHeavyException {
+	private void loadRobot(ListIterator<Robot> i) throws ItemTooHeavyException {
 		Robot robot = i.next();
 		assert(robot.isEmpty());
+		MailItem m;
 		// System.out.printf("P: %3d%n", pool.size());
-		
+		ListIterator<Item> j = pool.listIterator();
 		if (pool.size() > 0) {
 			try {
-			robot.addToHand(j.next().mailItem); // hand first as we want higher priority delivered first
-			j.remove();
-			if (pool.size() > 0) {
-				robot.addToTube(j.next().mailItem);
-				j.remove();
+				m = j.next().mailItem;
+				if(m.getWeight() <= Robot.INDIVIDUAL_MAX_WEIGHT) {
+					robot.addToHand(m); // hand first as we want higher priority delivered first
+					j.remove();
+				}
+				// j.remove();
+				if (pool.size() > 0) {
+					m = j.next().mailItem;
+					if(m.getWeight() > Robot.INDIVIDUAL_MAX_WEIGHT) {
+						; // can't do anything
+						return;
+					} else {
+						System.out.println(m.getWeight());
+						robot.addToTube(m);
+						j.remove();	
+					}
+
+				}
+			if(robot.getTube() != null) {
+				robot.dispatch(); // send the robot off if it has any items to deliver
+				i.remove();       // remove from mailPool queue
+			} else {
+				// robot not loaded
+				;
 			}
-			robot.dispatch(); // send the robot off if it has any items to deliver
-			i.remove();       // remove from mailPool queue
+			
 			} catch (Exception e) { 
 	            throw e; 
 	        } 
 		}
 	}
+
 	
 	public void disbandTeam(Team team) {
+		for(Robot robot : team.getRobotList()) {
+			robot.setInTeam(false);
+		}
 		setOfTeams.remove(team);
+		
 	}
 	
 	
@@ -181,10 +253,7 @@ public class MailPool implements IMailPool {
 		Robot nextRobot;
 		nextRobot = i.next();
 		
-		ArrayList<Robot> teamRobots = team.getRobotList();
-		
-		teamRobots.add(nextRobot);
-		
+		team.addRobot(nextRobot);
 	}
 	
 	
